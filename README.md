@@ -35,11 +35,11 @@ And a pattern of 10 beats and 16 steps:
 
 ![10 beats distributed on 16 steps](/assets/images/10_16.PNG)
 
-The rotation control allows the user to shift the beginning of the pattern by 0 - 15 steps so with the original pattern
+The rotation control allows the user to shift the beginning of the pattern by 0 - 15 steps so with the original pattern:
 
 ![5 beats distributed on 16 steps](/assets/images/5_16.PNG)
 
-Adding a rotation of 2 would result in the following pattern
+Adding a rotation of 2 would result in the following pattern:
 
 ![5 beats distributed on 16 steps with a rotation of two steps](/assets/images/5_16_rot2.PNG)
 
