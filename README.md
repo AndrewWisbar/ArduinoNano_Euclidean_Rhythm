@@ -15,12 +15,12 @@ Source code and plans for a Eurorack format Euclidean Rhythm Generator, with an 
 - Design for a eurorack panel + stripboard/pcb layout
 - Circuit Shematics
 - A CV control system to allow external signals to control the module, including an external clock signal for the tempo
-- Switch the timing of the unit to use the arduinos built in timers, instead of the millis() function
 - A 7 segment display to show the tempo of the module in BPM
+- A better method of measuring inputs, to help reduce jittering
 
 ## Known Issues
 
-- Current timing system often produces inconsistent timing, especially an apparent pause when going from step 15 back to step 0
+- The module occationally freezes, most likely having to do with jitter on the analogue rate input
 
 ## Description
 

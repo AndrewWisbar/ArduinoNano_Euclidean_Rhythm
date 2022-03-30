@@ -4,26 +4,44 @@
 const  uint16_t t_load = 0;
 
 //General Symbolic COnstants
-#define MAX_LEDS 16
-#define NUM_CHANNELS 4
-#define BRIGHT 10
+#define MAX_LEDS        16
+#define NUM_CHANNELS     4
+#define BRIGHT          10
 
 //Digital Outputs
-#define LED_PIN  2
-#define GATE1_PIN 3
-#define GATE2_PIN 4
-#define GATE3_PIN 5
-#define GATE4_PIN 6
-
+#define LED_PIN          2
+#define GATE1_PIN        3
+#define GATE2_PIN        4
+#define GATE3_PIN        5
+#define GATE4_PIN        6
 
 //Analog Inputs
-#define RATE_IN 0
-#define STEPS_IN 1
-#define HITS_IN 2
-#define ROT_IN 3
+#define RATE_IN         A0
+#define STEPS_IN        A1
+#define HITS_IN         A2
+#define ROT_IN          A3
 
 //Digital Inputs
-#define CHANNEL_PIN 7
+#define CHANNEL_PIN      7
+
+//Rotary Encoder
+#define CLK              9
+#define DT              10
+
+//Seven Segment Display Pins
+/*
+#define D_PIN1 8
+#define D_PIN2 9
+#define D_PIN3 10
+
+#define SEG1 11
+#define SEG2 12
+#define SEG3 13
+#define SEG4 A3
+#define SEG5 A4
+#define SEG6 A5
+#define SEG7 A6
+*/
 
 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -72,25 +90,32 @@ int activeChannel = 0;
 bool buttonReleased = 1;
 bool channelUpdated = 0;
 
-int chColors[][3] = {{115, 171, 38}, {217, 28, 154}, {48, 138, 207}, {235, 167, 21}};
+bool CLKState;
+bool lastCLKState;
+
+int chColors[][3] = {{72, 163, 15}, {168, 10, 10}, {3, 21, 153}, {189, 154, 0}};
 
 Channel channels[] = {Channel(GATE1_PIN, chColors[0]), Channel(GATE2_PIN, chColors[1]), Channel(GATE3_PIN, chColors[2]), Channel(GATE4_PIN, chColors[3])};
 
 Adafruit_NeoPixel strip(MAX_LEDS, LED_PIN, NEO_GRB + NEO_KHZ800);
-
 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 void setup()
 {
+  pinMode(CLK, INPUT);
+  pinMode(DT, INPUT);
   pinMode(LED_PIN, OUTPUT);
   pinMode(CHANNEL_PIN, INPUT);
-
+  Serial.begin(9600);
   strip.begin();
   strip.setBrightness(BRIGHT);
   strip.show();
-
-  Serial.begin(9600);
-
+  /*
+  byte digitPins[] = {D_PIN1, D_PIN2, D_PIN3};
+  byte segPins[] = {SEG1, SEG2, SEG3, SEG4, SEG5, SEG6, SEG7};
+  
+  sevseg.begin(COMMON_ANODE, 3, digitPins, segPins, false, false, false, true);
+  */
   // Reset Timer1 control reg a
   TCCR1A = 0;
 
@@ -117,8 +142,13 @@ void loop()
   channels[activeChannel].draw();
 }
 
+/**
+ * Timer interupt to control channel updates and gates
+ * 
+ * Called twice per step, once to potentially open the gate, and once to close it.
+ */
 ISR(TIMER1_COMPA_vect) {
-  state = !state; // state is used to control the gate length
+  state = !state; // state is used to control the gate length relative to the rate of the module
   for (int i = 0; i < NUM_CHANNELS; i++) {
     channels[i].update();
   }
@@ -128,18 +158,34 @@ ISR(TIMER1_COMPA_vect) {
 
 void readControls() {
   channelUpdated = 0;
-  period = map(analogRead(RATE_IN) / 4, 0, 255, 2500, 65535) / 2;
+  
+  CLKState = digitalRead(CLK);
+  if(CLKState == 0 && lastCLKState == 1) {
+    Serial.print("Clicked: ");
+    if(digitalRead(DT) == CLKState) {
+      if(period > 1684) {
+        period -= 64;
+        Serial.println("Faster");
+      }
+    }
+    else {
+      if(period < 32703) {
+        period += 64;
+        Serial.println("Slower");
+      }
+    }
+  }
   OCR1A = period;
   int checkSteps = map(analogRead(STEPS_IN) / 64, 0, 15, 1, 16);
   int checkHits = map(analogRead(HITS_IN) / 64, 0, 15, 0, checkSteps);
   int checkRot = map (analogRead(ROT_IN) / 64, 0, 15, 0, checkSteps - 1);
 
+
+
+  lastCLKState = CLKState;
   //If the button is held for more than one loop,
   //do not execute until the button has been released
-  if (digitalRead(CHANNEL_PIN) && buttonReleased) {
-    //Serial.print("Change Channel");
-    //Serial.println();
-
+  if (!digitalRead(CHANNEL_PIN) && buttonReleased) {
     activeChannel++;
     activeChannel %= 4;
 
@@ -148,44 +194,33 @@ void readControls() {
     lastRot = checkRot;
 
     buttonReleased = 0;
-
   }
-  else if (!digitalRead(CHANNEL_PIN)) {
+  else if (digitalRead(CHANNEL_PIN)) {
     buttonReleased = 1;
   }
 
   if (checkSteps != lastSteps) {
-    //Serial.print("Changing Steps ");
-    //Serial.print(checkSteps);
-    //Serial.println();
     channels[activeChannel].setSteps(checkSteps);
     lastSteps = checkSteps;
     channelUpdated = 1;
   }
 
   if (checkHits != lastHits) {
-    //Serial.print("Changing Hits ");
-    //Serial.print(checkHits);
-    //Serial.println();
     channels[activeChannel].setHits(checkHits);
     lastHits = checkHits;
     channelUpdated = 1;
   }
 
   if (checkRot != lastRot) {
-    //Serial.print("Changing Rot ");
-    //Serial.print(checkRot);
-    //Serial.println();
     channels[activeChannel].setRot(checkRot);
     lastRot = checkRot;
     channelUpdated = 1;
   }
-
+ 
   if (channelUpdated) {
     channels[activeChannel].calcEuclid();
   }
 }
-
 
 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
